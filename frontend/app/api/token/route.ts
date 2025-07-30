@@ -4,18 +4,15 @@ import { supabase } from '@/lib/supabase';
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    const username = formData.get('username') as string;
+    const email = formData.get('email') as string;
     const password = formData.get('password') as string;
 
-    if (!username || !password) {
+    if (!email || !password) {
       return NextResponse.json(
-        { detail: "Username and password are required" },
+        { detail: "Email and password are required" },
         { status: 400 }
       );
     }
-
-    // Use email format for Supabase Auth (username@domain.com)
-    const email = username.includes('@') ? username : `${username}@tiktokbot.com`;
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,

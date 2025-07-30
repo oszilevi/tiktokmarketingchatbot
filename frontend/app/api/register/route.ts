@@ -3,10 +3,14 @@ import { supabase } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
-    const { username, password } = await request.json();
+    const { email, username, password } = await request.json();
 
-    // Use email format for Supabase Auth (username@domain.com)
-    const email = username.includes('@') ? username : `${username}@tiktokbot.com`;
+    if (!email || !username || !password) {
+      return NextResponse.json(
+        { detail: "Email, username, and password are required" },
+        { status: 400 }
+      );
+    }
 
     const { data, error } = await supabase.auth.signUp({
       email,
