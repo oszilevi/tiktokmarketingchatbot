@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { authApi, chatApi } from '@/lib/api';
 
 interface Message {
@@ -57,7 +58,7 @@ export default function ChatPage() {
         
         // Load chat history
         const history = await chatApi.getMessages();
-        const formattedMessages = history.flatMap((msg: any) => [
+        const formattedMessages = history.flatMap((msg: { id: number; content: string; response: string; created_at: string; notes?: Array<{ id: number; title: string; content: string }> }) => [
           {
             id: msg.id,
             text: msg.content,
@@ -72,10 +73,10 @@ export default function ChatPage() {
             isUser: false,
             timestamp: new Date(msg.created_at),
           }
-        ]).filter(msg => msg.text);
+        ]).filter((msg: { text: string }) => msg.text);
         
         setMessages(formattedMessages);
-      } catch (error: any) {
+      } catch {
         // Clear any invalid token
         authApi.logout();
         // Force redirect to login
@@ -130,7 +131,7 @@ export default function ChatPage() {
       
       // Stream the response
       let fullResponse = '';
-      let noteData: any = null;
+      let noteData: { id: number; title: string; content: string } | null = null;
       
       await chatApi.sendMessageStream(inputMessage, (chunk) => {
         fullResponse += chunk;
@@ -168,7 +169,7 @@ export default function ChatPage() {
                   // Update the user message with the note
                   setMessages((prev) => 
                     prev.map((msg) => 
-                      msg.id === userMessage.id ? { ...msg, note: noteData } : msg
+                      msg.id === userMessage.id ? { ...msg, note: noteData || undefined } : msg
                     )
                   );
                 }
@@ -280,7 +281,7 @@ export default function ChatPage() {
           )
         );
       }
-    } catch (error) {
+    } catch {
       setMessages((prev) => 
         prev.map((msg) => 
           msg.id === userMessage.id ? { ...msg, status: 'error' } : msg
@@ -347,10 +348,11 @@ export default function ChatPage() {
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <div className="relative aspect-[9/16] rounded-xl overflow-hidden bg-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-                      <img 
+                      <Image 
                         src={video.thumbnail} 
                         alt={video.title}
-                        className="w-full h-full object-cover"
+                        fill
+                        className="object-cover"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         <div className="absolute bottom-0 left-0 right-0 p-3">
@@ -559,7 +561,7 @@ export default function ChatPage() {
                 </div>
                 <div>
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">TikTok Content Assistant</h3>
-                  <p className="text-gray-600">I'll help you create amazing TikTok content with ideas, visuals, and tips!</p>
+                  <p className="text-gray-600">I&apos;ll help you create amazing TikTok content with ideas, visuals, and tips!</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
                   <div className="bg-white p-4 rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all duration-200 cursor-pointer group">
@@ -567,21 +569,21 @@ export default function ChatPage() {
                       <span className="text-2xl group-hover:scale-110 transition-transform">🎨</span>
                       <h4 className="font-semibold text-gray-900">Visual Ideas</h4>
                     </div>
-                    <p className="text-sm text-gray-600">Type "image" for thumbnail inspiration</p>
+                    <p className="text-sm text-gray-600">Type &quot;image&quot; for thumbnail inspiration</p>
                   </div>
                   <div className="bg-white p-4 rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all duration-200 cursor-pointer group">
                     <div className="flex items-center space-x-2 mb-1">
                       <span className="text-2xl group-hover:scale-110 transition-transform">📝</span>
                       <h4 className="font-semibold text-gray-900">Content Tips</h4>
                     </div>
-                    <p className="text-sm text-gray-600">Type "tips" or "list" for best practices</p>
+                    <p className="text-sm text-gray-600">Type &quot;tips&quot; or &quot;list&quot; for best practices</p>
                   </div>
                   <div className="bg-white p-4 rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all duration-200 cursor-pointer group">
                     <div className="flex items-center space-x-2 mb-1">
                       <span className="text-2xl group-hover:scale-110 transition-transform">🎬</span>
                       <h4 className="font-semibold text-gray-900">Video Examples</h4>
                     </div>
-                    <p className="text-sm text-gray-600">Type "video" for sample content</p>
+                    <p className="text-sm text-gray-600">Type &quot;video&quot; for sample content</p>
                   </div>
                   <div className="bg-white p-4 rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all duration-200 cursor-pointer group">
                     <div className="flex items-center space-x-2 mb-1">
@@ -591,7 +593,7 @@ export default function ChatPage() {
                     <p className="text-sm text-gray-600">Ask about current trends</p>
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-4">Try typing: "image", "tips", "video", or ask any question!</p>
+                <p className="text-xs text-gray-500 mt-4">Try typing: &quot;image&quot;, &quot;tips&quot;, &quot;video&quot;, or ask any question!</p>
               </div>
             </div>
           ) : (
@@ -681,9 +683,11 @@ export default function ChatPage() {
                         {/* Dynamic content rendering */}
                         {!message.isUser && message.contentType === 'image' && message.content?.imageUrl && (
                           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in">
-                            <img 
+                            <Image 
                               src={message.content.imageUrl} 
                               alt={message.content.title || 'TikTok content'}
+                              width={400}
+                              height={300}
                               className="w-full h-auto rounded-t-xl"
                             />
                             {(message.content.title || message.content.description) && (

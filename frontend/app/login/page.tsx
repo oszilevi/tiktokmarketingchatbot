@@ -29,9 +29,10 @@ export default function LoginPage() {
         setUsername('');
         setPassword('');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Login/Register error:', err);
-      setError(err.response?.data?.detail || err.message || 'An error occurred');
+      const error = err as { response?: { data?: { detail?: string } }; message?: string };
+      setError(error.response?.data?.detail || error.message || 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -180,7 +181,7 @@ export default function LoginPage() {
             >
               {isLogin ? (
                 <span>
-                  Don't have an account?{' '}
+                  Don&apos;t have an account?{' '}
                   <span className="font-semibold underline underline-offset-2">Create one</span>
                 </span>
               ) : (
