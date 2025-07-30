@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { supabase } from '@/lib/supabase';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || 'your-openai-api-key-here',
@@ -8,6 +9,7 @@ const openai = new OpenAI({
 export async function POST(request: NextRequest) {
   try {
     const { message } = await request.json();
+    const authHeader = request.headers.get('authorization');
 
     if (!message || !message.trim()) {
       return NextResponse.json(
@@ -15,6 +17,27 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { detail: "Missing or invalid authorization header" },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.substring(7);
+
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+
+    if (userError || !user) {
+      return NextResponse.json(
+        { detail: "Invalid token" },
+        { status: 401 }
+      );
+    }
+
+    const username = user.user_metadata?.username || user.email?.split('@')[0] || 'user';
 
     const systemPrompt = `You are a helpful TikTok content creation assistant. You help users create engaging TikTok content, provide tips, and give creative suggestions. 
 
@@ -24,7 +47,7 @@ Your responses should be:
 - Helpful with practical tips
 - Creative and inspiring
 
-User: demo_user`;
+User: ${username}`;
 
     try {
       const stream = await openai.chat.completions.create({
@@ -39,15 +62,40 @@ User: demo_user`;
       });
 
       const encoder = new TextEncoder();
+      let fullResponse = '';
+
       const readableStream = new ReadableStream({
         async start(controller) {
           try {
             for await (const chunk of stream) {
               const content = chunk.choices[0]?.delta?.content;
               if (content) {
+                fullResponse += content;
                 const data = `data: ${JSON.stringify({ chunk: content })}\n\n`;
                 controller.enqueue(encoder.encode(data));
               }
+            }
+            
+            // Save the complete message to database after streaming
+            const { data: savedMessage } = await supabase
+              .from('messages')
+              .insert({
+                user_id: user.id,
+                content: message,
+                response: fullResponse
+              })
+              .select()
+              .single();
+
+            // Create a note for the message
+            if (savedMessage) {
+              await supabase
+                .from('notes')
+                .insert({
+                  message_id: savedMessage.id,
+                  title: "Chat Summary",
+                  content: `Discussion about: ${message.substring(0, 50)}...`
+                });
             }
             
             const doneData = `data: {"done": true}\n\n`;
@@ -75,6 +123,15 @@ User: demo_user`;
       console.error('OpenAI API Error:', openaiError);
       const encoder = new TextEncoder();
       const fallbackMessage = `I'm having trouble connecting to my AI brain right now. But I can still help you with TikTok content! You said: '${message}'. What kind of TikTok content are you looking to create?`;
+      
+      // Save fallback message to database
+      await supabase
+        .from('messages')
+        .insert({
+          user_id: user.id,
+          content: message,
+          response: fallbackMessage
+        });
       
       const readableStream = new ReadableStream({
         start(controller) {

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { authApi } from '@/lib/api';
+import { authApi } from '@/lib/supabase-api';
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);

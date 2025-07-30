@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// Access the same users object (in a real app, this would be a database)
-const users: Record<string, { password: string; id: number }> = {};
+import { supabase } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,7 +7,22 @@ export async function POST(request: NextRequest) {
     const username = formData.get('username') as string;
     const password = formData.get('password') as string;
 
-    if (!username || !password || !(username in users) || users[username].password !== password) {
+    if (!username || !password) {
+      return NextResponse.json(
+        { detail: "Username and password are required" },
+        { status: 400 }
+      );
+    }
+
+    // Use email format for Supabase Auth (username@domain.com)
+    const email = username.includes('@') ? username : `${username}@tiktokbot.com`;
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
       return NextResponse.json(
         { detail: "Invalid credentials" },
         { status: 401 }
@@ -17,8 +30,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      access_token: `fake-token-${username}`,
-      token_type: "bearer"
+      access_token: data.session?.access_token,
+      refresh_token: data.session?.refresh_token,
+      token_type: "bearer",
+      user: data.user
     });
   } catch {
     return NextResponse.json(
