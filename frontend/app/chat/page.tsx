@@ -46,7 +46,6 @@ export default function ChatPage() {
   const [viewMode, setViewMode] = useState<'chat' | 'gallery' | 'notes'>('chat');
   const [videos, setVideos] = useState<Video[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
-  const [showNotes, setShowNotes] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -387,7 +386,7 @@ export default function ChatPage() {
                     </div>
                     <h3 className="text-2xl font-bold text-gray-900 mb-2">Start Your TikTok Journey!</h3>
                     <p className="text-gray-600 max-w-md mx-auto">
-                      I'm here to help you create amazing TikTok content. Ask me about trends, ideas, or best practices!
+                      I&apos;m here to help you create amazing TikTok content. Ask me about trends, ideas, or best practices!
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6 max-w-lg mx-auto">
                       <button
