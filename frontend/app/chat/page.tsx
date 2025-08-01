@@ -19,11 +19,25 @@ interface Message {
     title?: string;
     description?: string;
   };
-  note?: {
+}
+
+interface ChatSession {
+  id: number;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  gallery_videos: Video[];
+  messages: Array<{
+    id: number;
+    content: string;
+    response: string;
+    created_at: string;
+  }>;
+  notes: Array<{
     id: number;
     title: string;
     content: string;
-  };
+  }>;
 }
 
 interface Video {
@@ -39,59 +53,54 @@ interface Video {
 }
 
 export default function ChatPage() {
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<{ username: string } | null>(null);
   const [viewMode, setViewMode] = useState<'chat' | 'gallery' | 'notes'>('chat');
-  const [videos, setVideos] = useState<Video[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  // Check authentication and load message history
+  // Check authentication and load chat sessions
   useEffect(() => {
     const initializeChat = async () => {
       try {
         const userData = await authApi.getMe();
         setUser(userData);
         
-        // Load chat history
-        console.log('Loading chat history...');
-        const history = await chatApi.getMessages();
-        console.log('Chat history received:', history);
+        // Load chat sessions
+        console.log('Loading chat sessions...');
+        const sessionData = await chatApi.getSessions();
+        console.log('Sessions received:', sessionData);
         
-        if (!history || !Array.isArray(history)) {
-          console.log('No history or invalid format');
+        if (!sessionData || !Array.isArray(sessionData)) {
+          console.log('No sessions or invalid format');
+          setSessions([]);
+          // Create a default session
+          const newSession = await chatApi.createSession('New Chat');
+          setSessions([newSession]);
+          setCurrentSession(newSession);
           setMessages([]);
           return;
         }
         
-        const formattedMessages = history.flatMap((msg: { 
-          id: number; 
-          content: string; 
-          response: string; 
-          created_at: string; 
-          notes?: Array<{ id: number; title: string; content: string }> 
-        }) => [
-          {
-            id: msg.id * 2,
-            text: msg.content,
-            isUser: true,
-            timestamp: new Date(msg.created_at),
-            status: 'sent' as const,
-            note: msg.notes?.[0]
-          },
-          {
-            id: msg.id * 2 + 1,
-            text: msg.response,
-            isUser: false,
-            timestamp: new Date(msg.created_at),
-          }
-        ]).filter((msg: { text: string }) => msg.text && msg.text.trim());
+        setSessions(sessionData);
         
-        console.log('Formatted messages:', formattedMessages);
-        setMessages(formattedMessages);
+        // Set current session to the most recent one, or create a new one if none exist
+        if (sessionData.length > 0) {
+          const mostRecent = sessionData[0]; // Already sorted by updated_at desc
+          setCurrentSession(mostRecent);
+          loadSessionMessages(mostRecent);
+        } else {
+          // Create a default session
+          const newSession = await chatApi.createSession('New Chat');
+          setSessions([newSession]);
+          setCurrentSession(newSession);
+          setMessages([]);
+        }
       } catch (error) {
         console.error('Failed to initialize chat:', error);
         authApi.logout();
@@ -102,6 +111,48 @@ export default function ChatPage() {
     initializeChat();
   }, [router]);
 
+  // Load messages for a specific session
+  const loadSessionMessages = (session: ChatSession) => {
+    const formattedMessages = session.messages.flatMap((msg) => [
+      {
+        id: msg.id * 2,
+        text: msg.content,
+        isUser: true,
+        timestamp: new Date(msg.created_at),
+        status: 'sent' as const,
+      },
+      {
+        id: msg.id * 2 + 1,
+        text: msg.response,
+        isUser: false,
+        timestamp: new Date(msg.created_at),
+      }
+    ]).filter((msg) => msg.text && msg.text.trim());
+    
+    console.log('Loaded messages for session:', session.id, formattedMessages);
+    setMessages(formattedMessages);
+  };
+
+  // Switch to a different session
+  const switchToSession = (session: ChatSession) => {
+    setCurrentSession(session);
+    loadSessionMessages(session);
+    setViewMode('chat');
+  };
+
+  // Create a new session
+  const createNewSession = async () => {
+    try {
+      const newSession = await chatApi.createSession('New Chat');
+      setSessions(prev => [newSession, ...prev]);
+      setCurrentSession(newSession);
+      setMessages([]);
+      setViewMode('chat');
+    } catch (error) {
+      console.error('Failed to create new session:', error);
+    }
+  };
+
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -110,8 +161,8 @@ export default function ChatPage() {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Prevent submission if empty or already loading
-    if (!inputMessage.trim() || loading) return;
+    // Prevent submission if empty, already loading, or no current session
+    if (!inputMessage.trim() || loading || !currentSession) return;
 
     const messageText = inputMessage.trim();
     setInputMessage('');
@@ -148,7 +199,7 @@ export default function ChatPage() {
 
       // Stream the AI response (ONLY ONE API CALL)
       let fullResponse = '';
-      await chatApi.sendMessageStream(messageText, (chunk) => {
+      await chatApi.sendMessageStream(messageText, currentSession.id, (chunk) => {
         fullResponse += chunk;
         setMessages(prev => 
           prev.map(msg => 
@@ -157,21 +208,25 @@ export default function ChatPage() {
         );
       });
 
-      // Add note to user message (backend saves to database)
-      const note = {
-        id: Date.now(),
-        title: "Chat Summary",
-        content: `Discussion about: ${messageText.substring(0, 50)}...`
-      };
-
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === userMessage.id ? { ...msg, note } : msg
-        )
-      );
-
       // Handle special content types based on user input
       handleSpecialContent(messageText.toLowerCase(), botMessage.id);
+
+      // Update session title if this is the first message
+      if (messages.length === 0) {
+        const title = messageText.length > 30 ? messageText.substring(0, 30) + '...' : messageText;
+        try {
+          await chatApi.updateSession(currentSession.id, { title });
+          // Update local session state
+          setSessions(prev => 
+            prev.map(session => 
+              session.id === currentSession.id ? { ...session, title } : session
+            )
+          );
+          setCurrentSession(prev => prev ? { ...prev, title } : null);
+        } catch (error) {
+          console.error('Failed to update session title:', error);
+        }
+      }
 
     } catch (error) {
       console.error('Chat error:', error);
@@ -272,7 +327,23 @@ export default function ChatPage() {
         }
       ];
 
-      setVideos(sampleVideos);
+      // Save videos to current session
+      if (currentSession) {
+        chatApi.updateSession(currentSession.id, { gallery_videos: sampleVideos })
+          .then(updatedSession => {
+            // Update local session state
+            setSessions(prev => 
+              prev.map(session => 
+                session.id === currentSession.id ? { ...session, gallery_videos: sampleVideos } : session
+              )
+            );
+            setCurrentSession(prev => prev ? { ...prev, gallery_videos: sampleVideos } : null);
+          })
+          .catch(error => {
+            console.error('Failed to save gallery videos:', error);
+          });
+      }
+
       setViewMode('gallery');
       
       setMessages(prev => 
@@ -309,12 +380,45 @@ export default function ChatPage() {
   return (
     <div className="flex h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
       {/* Sidebar */}
-      <div className="w-80 bg-white/80 backdrop-blur-sm shadow-xl border-r border-gray-200">
+      <div className="w-80 bg-white/80 backdrop-blur-sm shadow-xl border-r border-gray-200 flex flex-col">
         <div className="p-6 border-b border-gray-200">
           <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
             TikTok Assistant
           </h1>
           <p className="text-sm text-gray-600 mt-1">Welcome back, {user.username}!</p>
+          <button
+            onClick={createNewSession}
+            className="mt-3 w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200 text-sm"
+          >
+            + New Chat
+          </button>
+        </div>
+
+        {/* Chat Sessions List */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Recent Chats</h3>
+            <div className="space-y-2">
+              {sessions.map((session) => (
+                <button
+                  key={session.id}
+                  onClick={() => switchToSession(session)}
+                  className={`w-full text-left p-3 rounded-lg transition-colors duration-200 ${
+                    currentSession?.id === session.id
+                      ? 'bg-indigo-100 border border-indigo-200'
+                      : 'bg-gray-50 hover:bg-gray-100 border border-transparent'
+                  }`}
+                >
+                  <div className="font-medium text-gray-900 text-sm truncate">
+                    {session.title}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {new Date(session.updated_at).toLocaleDateString()}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
         
         {/* View Mode Tabs */}
@@ -354,18 +458,20 @@ export default function ChatPage() {
         {/* Notes Section */}
         {viewMode === 'notes' && (
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            <h3 className="font-semibold text-gray-900 mb-3">AI-Generated Notes</h3>
-            {messages
-              .filter(msg => msg.note)
-              .map((msg) => (
-                <div key={msg.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
-                  <h4 className="font-medium text-gray-900">{msg.note?.title}</h4>
-                  <p className="text-sm text-gray-600 mt-1">{msg.note?.content}</p>
-                  <p className="text-xs text-gray-400 mt-2">
-                    {msg.timestamp.toLocaleTimeString()}
-                  </p>
+            <h3 className="font-semibold text-gray-900 mb-3">Session Notes</h3>
+            {currentSession?.notes && currentSession.notes.length > 0 ? (
+              currentSession.notes.map((note) => (
+                <div key={note.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                  <h4 className="font-medium text-gray-900">{note.title}</h4>
+                  <p className="text-sm text-gray-600 mt-1">{note.content}</p>
                 </div>
-              ))}
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No notes for this session yet.</p>
+                <p className="text-sm mt-1">Notes will be generated as you chat.</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -522,8 +628,9 @@ export default function ChatPage() {
         {/* Gallery View */}
         {viewMode === 'gallery' && (
           <div className="flex-1 overflow-auto p-6">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-              {videos.map((video, index) => (
+            {currentSession?.gallery_videos && currentSession.gallery_videos.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                {currentSession.gallery_videos.map((video, index) => (
                 <div
                   key={video.id}
                   onClick={() => setSelectedVideo(video)}
@@ -548,8 +655,23 @@ export default function ChatPage() {
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center py-16">
+                  <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full mb-6">
+                    <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">No Videos Yet</h3>
+                  <p className="text-gray-600 max-w-md mx-auto">
+                    Ask me about videos or examples to populate this gallery with TikTok content ideas!
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

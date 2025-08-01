@@ -8,7 +8,7 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
-    const { message } = await request.json();
+    const { message, sessionId } = await request.json();
     const authHeader = request.headers.get('authorization');
 
     if (!message || !message.trim()) {
@@ -81,21 +81,37 @@ User: ${username}`;
               .from('messages')
               .insert({
                 user_id: user.id,
+                session_id: sessionId,
                 content: message,
                 response: fullResponse
               })
               .select()
               .single();
 
-            // Create a note for the message
-            if (savedMessage) {
+            // Update session's updated_at timestamp and create a note if it's the first message
+            if (sessionId) {
               await supabase
-                .from('notes')
-                .insert({
-                  message_id: savedMessage.id,
-                  title: "Chat Summary",
-                  content: `Discussion about: ${message.substring(0, 50)}...`
-                });
+                .from('chat_sessions')
+                .update({ updated_at: new Date().toISOString() })
+                .eq('id', sessionId)
+                .eq('user_id', user.id);
+
+              // Check if this is the first message in the session
+              const { data: messageCount } = await supabase
+                .from('messages')
+                .select('id', { count: 'exact' })
+                .eq('session_id', sessionId);
+
+              // Create a session summary note if this is the first or few messages
+              if (messageCount && (messageCount as any).length === 1) {
+                await supabase
+                  .from('notes')
+                  .insert({
+                    session_id: sessionId,
+                    title: "Session Summary",
+                    content: `Chat started with: "${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`
+                  });
+              }
             }
             
             const doneData = `data: {"done": true}\n\n`;
@@ -129,6 +145,7 @@ User: ${username}`;
         .from('messages')
         .insert({
           user_id: user.id,
+          session_id: sessionId,
           content: message,
           response: fallbackMessage
         });

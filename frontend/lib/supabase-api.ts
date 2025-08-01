@@ -87,6 +87,38 @@ export const authApi = {
 };
 
 export const chatApi = {
+  getSessions: async () => {
+    try {
+      console.log('API: Fetching chat sessions...');
+      const response = await api.get('/sessions');
+      console.log('API: Sessions response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('API: Failed to fetch sessions:', error);
+      throw error;
+    }
+  },
+
+  createSession: async (title?: string) => {
+    try {
+      const response = await api.post('/sessions', { title });
+      return response.data;
+    } catch (error) {
+      console.error('API: Failed to create session:', error);
+      throw error;
+    }
+  },
+
+  updateSession: async (sessionId: number, updates: { title?: string; gallery_videos?: any[] }) => {
+    try {
+      const response = await api.patch(`/sessions/${sessionId}`, updates);
+      return response.data;
+    } catch (error) {
+      console.error('API: Failed to update session:', error);
+      throw error;
+    }
+  },
+
   getMessages: async () => {
     try {
       console.log('API: Fetching messages...');
@@ -114,7 +146,7 @@ export const chatApi = {
     return response.data;
   },
   
-  sendMessageStream: async (message: string, onChunk: (chunk: string) => void) => {
+  sendMessageStream: async (message: string, sessionId: number, onChunk: (chunk: string) => void) => {
     const token = Cookies.get('sb-access-token');
     const response = await fetch(`${API_URL}/chat/stream`, {
       method: 'POST',
@@ -122,7 +154,7 @@ export const chatApi = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, sessionId }),
     });
     
     if (!response.ok) {
