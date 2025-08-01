@@ -57,7 +57,16 @@ export default function ChatPage() {
         setUser(userData);
         
         // Load chat history
+        console.log('Loading chat history...');
         const history = await chatApi.getMessages();
+        console.log('Chat history received:', history);
+        
+        if (!history || !Array.isArray(history)) {
+          console.log('No history or invalid format');
+          setMessages([]);
+          return;
+        }
+        
         const formattedMessages = history.flatMap((msg: { 
           id: number; 
           content: string; 
@@ -79,10 +88,12 @@ export default function ChatPage() {
             isUser: false,
             timestamp: new Date(msg.created_at),
           }
-        ]).filter((msg: { text: string }) => msg.text);
+        ]).filter((msg: { text: string }) => msg.text && msg.text.trim());
         
+        console.log('Formatted messages:', formattedMessages);
         setMessages(formattedMessages);
-      } catch {
+      } catch (error) {
+        console.error('Failed to initialize chat:', error);
         authApi.logout();
         router.push('/login');
       }

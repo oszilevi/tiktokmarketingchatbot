@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch messages for this user
+    console.log('Fetching messages for user:', user.id);
     const { data: messages, error } = await supabase
       .from('messages')
       .select(`
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    console.log('Found messages:', messages?.length || 0);
     return NextResponse.json(messages || []);
   } catch {
     return NextResponse.json(

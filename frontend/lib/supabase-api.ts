@@ -88,8 +88,15 @@ export const authApi = {
 
 export const chatApi = {
   getMessages: async () => {
-    const response = await api.get('/messages');
-    return response.data;
+    try {
+      console.log('API: Fetching messages...');
+      const response = await api.get('/messages');
+      console.log('API: Messages response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('API: Failed to fetch messages:', error);
+      throw error;
+    }
   },
   
   getNotes: async () => {
