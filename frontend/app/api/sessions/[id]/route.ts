@@ -4,7 +4,7 @@ import { Video } from '@/types/video';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { title, gallery_videos } = await request.json();
@@ -29,7 +29,8 @@ export async function PATCH(
       );
     }
 
-    const sessionId = parseInt(params.id);
+    const { id } = await params;
+    const sessionId = parseInt(id);
 
     // Update the session
     const updateData: { updated_at: string; title?: string; gallery_videos?: Video[] } = {

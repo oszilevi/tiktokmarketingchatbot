@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { title, content } = await request.json();
@@ -28,7 +28,8 @@ export async function POST(
       );
     }
 
-    const sessionId = parseInt(params.id);
+    const { id } = await params;
+    const sessionId = parseInt(id);
 
     // Verify the session belongs to this user
     const { data: session } = await supabase
