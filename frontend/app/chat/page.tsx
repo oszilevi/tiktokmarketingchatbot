@@ -306,26 +306,6 @@ export default function ChatPage() {
       // Handle special content types based on user input
       handleSpecialContent(messageText.toLowerCase(), botMessage.id);
 
-      // Update the session with the new messages in local state
-      const newMessage = {
-        id: Date.now() + 2,
-        content: messageText,
-        response: fullResponse,
-        created_at: new Date().toISOString()
-      };
-      
-      setSessions(prev => 
-        prev.map(session => 
-          session.id === currentSession.id 
-            ? { ...session, messages: [...session.messages, newMessage] }
-            : session
-        )
-      );
-      
-      setCurrentSession(prev => 
-        prev ? { ...prev, messages: [...prev.messages, newMessage] } : null
-      );
-
       // Update session title if this is the first message
       if (messages.length === 0) {
         const title = messageText.length > 30 ? messageText.substring(0, 30) + '...' : messageText;
@@ -847,11 +827,8 @@ export default function ChatPage() {
             )}
           </div>
         )}
-        </div>
-      </div>
-
-      {/* Video Modal */}
-      {selectedVideo && (
+        {/* Video Modal */}
+        {selectedVideo && (
         <div 
           className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
           onClick={() => setSelectedVideo(null)}
@@ -907,6 +884,7 @@ export default function ChatPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
