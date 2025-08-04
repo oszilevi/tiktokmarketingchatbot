@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createUserScopedClient } from '@/lib/supabase-server';
 import { Video } from '@/types/video';
 
 export async function GET(
@@ -18,8 +18,11 @@ export async function GET(
 
     const token = authHeader.substring(7);
 
+    // Create user-scoped Supabase client
+    const supabase = createUserScopedClient(token);
+
     // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError || !user) {
       return NextResponse.json(
@@ -77,8 +80,11 @@ export async function PATCH(
 
     const token = authHeader.substring(7);
 
+    // Create user-scoped Supabase client
+    const supabase = createUserScopedClient(token);
+
     // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError || !user) {
       return NextResponse.json(

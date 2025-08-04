@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { supabase } from '@/lib/supabase';
+import { createUserScopedClient } from '@/lib/supabase-server';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || 'your-openai-api-key-here',
@@ -27,8 +27,11 @@ export async function POST(request: NextRequest) {
 
     const token = authHeader.substring(7);
 
+    // Create user-scoped Supabase client
+    const supabase = createUserScopedClient(token);
+
     // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError || !user) {
       return NextResponse.json(
