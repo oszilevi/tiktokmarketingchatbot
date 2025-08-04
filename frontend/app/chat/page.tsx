@@ -10,7 +10,7 @@ interface Message {
   text: string;
   isUser: boolean;
   timestamp: Date;
-  status?: 'sending' | 'sent' | 'error';
+  status?: 'sending' | 'sent' | 'error' | 'thinking';
   contentType?: 'text' | 'image' | 'list' | 'video' | 'mixed';
   content?: {
     imageUrl?: string;
@@ -242,12 +242,13 @@ export default function ChatPage() {
       status: 'sending',
     };
 
-    // Create empty bot message for streaming
+    // Create thinking bot message for streaming
     const botMessage: Message = {
       id: Date.now() + 1,
       text: '',
       isUser: false,
       timestamp: new Date(),
+      status: 'thinking',
       contentType: 'text',
     };
 
@@ -264,13 +265,19 @@ export default function ChatPage() {
 
       // Stream the AI response (ONLY ONE API CALL)
       let fullResponse = '';
+      let isFirstChunk = true;
       await chatApi.sendMessageStream(messageText, currentSession.id, (chunk) => {
         fullResponse += chunk;
         setMessages(prev => 
           prev.map(msg => 
-            msg.id === botMessage.id ? { ...msg, text: fullResponse } : msg
+            msg.id === botMessage.id ? { 
+              ...msg, 
+              text: fullResponse,
+              status: isFirstChunk ? undefined : msg.status // Remove thinking status on first chunk
+            } : msg
           )
         );
+        isFirstChunk = false;
       });
 
       // Update the session's messages array with the new message
@@ -337,7 +344,7 @@ export default function ChatPage() {
       setMessages(prev => 
         prev.map(msg => 
           msg.id === botMessage.id 
-            ? { ...msg, text: 'Sorry, I encountered an error. Please try again.' } 
+            ? { ...msg, text: 'Sorry, I encountered an error. Please try again.', status: undefined } 
             : msg
         )
       );
@@ -697,9 +704,21 @@ export default function ChatPage() {
                             ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white' 
                             : 'bg-white border border-gray-200'
                         }`}>
-                          <p className={`text-sm ${message.isUser ? 'text-white' : 'text-gray-900'}`}>
-                            {message.text}
-                          </p>
+                          {/* Thinking Animation */}
+                          {!message.isUser && message.status === 'thinking' ? (
+                            <div className="flex items-center space-x-1">
+                              <span className="text-gray-500 text-sm mr-2">AI is thinking</span>
+                              <div className="flex space-x-1">
+                                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce"></div>
+                                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className={`text-sm ${message.isUser ? 'text-white' : 'text-gray-900'}`}>
+                              {message.text}
+                            </p>
+                          )}
                           
                           {/* Dynamic Content Rendering */}
                           {!message.isUser && message.contentType === 'image' && message.content?.imageUrl && (
@@ -743,11 +762,14 @@ export default function ChatPage() {
                           </span>
                           {message.status && (
                             <span className={`ml-2 text-xs ${
-                              message.status === 'error' ? 'text-red-500' : 'text-gray-400'
+                              message.status === 'error' ? 'text-red-500' : 
+                              message.status === 'thinking' ? 'text-indigo-500' :
+                              'text-gray-400'
                             }`}>
                               {message.status === 'sending' && '• Sending...'}
                               {message.status === 'sent' && '• Sent'}
                               {message.status === 'error' && '• Failed'}
+                              {message.status === 'thinking' && '• Thinking...'}
                             </span>
                           )}
                         </div>
