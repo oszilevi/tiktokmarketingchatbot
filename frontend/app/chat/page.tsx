@@ -63,6 +63,7 @@ export default function ChatPage() {
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const lastActivityRef = useRef<Date>(new Date());
 
   // Check authentication and load chat sessions
   useEffect(() => {
@@ -134,10 +135,29 @@ export default function ChatPage() {
   };
 
   // Switch to a different session
-  const switchToSession = (session: ChatSession) => {
-    setCurrentSession(session);
-    loadSessionMessages(session);
+  const switchToSession = async (session: ChatSession) => {
+    // Find the most up-to-date session from our state
+    const updatedSession = sessions.find(s => s.id === session.id) || session;
+    setCurrentSession(updatedSession);
+    loadSessionMessages(updatedSession);
     setViewMode('chat');
+    
+    // Optional: Fetch fresh session data to ensure we have the latest messages
+    // This is useful if the user has multiple tabs open or uses multiple devices
+    try {
+      const freshSessions = await chatApi.getSessions();
+      if (freshSessions && Array.isArray(freshSessions)) {
+        const freshSession = freshSessions.find(s => s.id === session.id);
+        if (freshSession) {
+          setSessions(freshSessions);
+          setCurrentSession(freshSession);
+          loadSessionMessages(freshSession);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to refresh session data:', error);
+      // Continue with cached data if refresh fails
+    }
   };
 
   // Create a new session
@@ -157,6 +177,51 @@ export default function ChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Periodically refresh sessions to catch updates from other tabs/devices
+  useEffect(() => {
+    // Only refresh if user has been active in the last 5 minutes
+    const refreshInterval = setInterval(async () => {
+      const timeSinceLastActivity = Date.now() - lastActivityRef.current.getTime();
+      
+      if (timeSinceLastActivity < 5 * 60 * 1000 && currentSession) { // 5 minutes
+        try {
+          const freshSessions = await chatApi.getSessions();
+          if (freshSessions && Array.isArray(freshSessions)) {
+            setSessions(freshSessions);
+            
+            // Update current session if it exists in fresh data
+            const freshCurrentSession = freshSessions.find(s => s.id === currentSession.id);
+            if (freshCurrentSession && freshCurrentSession.messages.length !== currentSession.messages.length) {
+              setCurrentSession(freshCurrentSession);
+              loadSessionMessages(freshCurrentSession);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to refresh sessions:', error);
+        }
+      }
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(refreshInterval);
+  }, [currentSession]);
+
+  // Track user activity
+  useEffect(() => {
+    const updateActivity = () => {
+      lastActivityRef.current = new Date();
+    };
+
+    window.addEventListener('mousemove', updateActivity);
+    window.addEventListener('keypress', updateActivity);
+    window.addEventListener('click', updateActivity);
+
+    return () => {
+      window.removeEventListener('mousemove', updateActivity);
+      window.removeEventListener('keypress', updateActivity);
+      window.removeEventListener('click', updateActivity);
+    };
+  }, []);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,8 +273,58 @@ export default function ChatPage() {
         );
       });
 
+      // Update the session's messages array with the new message
+      const newMessage = {
+        id: Date.now(),
+        content: messageText,
+        response: fullResponse,
+        created_at: new Date().toISOString()
+      };
+
+      // Update sessions state to include the new message
+      setSessions(prev => 
+        prev.map(session => 
+          session.id === currentSession.id 
+            ? { 
+                ...session, 
+                messages: [...(session.messages || []), newMessage],
+                updated_at: new Date().toISOString()
+              } 
+            : session
+        )
+      );
+
+      // Update current session as well
+      setCurrentSession(prev => 
+        prev ? { 
+          ...prev, 
+          messages: [...(prev.messages || []), newMessage],
+          updated_at: new Date().toISOString()
+        } : null
+      );
+
       // Handle special content types based on user input
       handleSpecialContent(messageText.toLowerCase(), botMessage.id);
+
+      // Update the session with the new messages in local state
+      const newMessage = {
+        id: Date.now() + 2,
+        content: messageText,
+        response: fullResponse,
+        created_at: new Date().toISOString()
+      };
+      
+      setSessions(prev => 
+        prev.map(session => 
+          session.id === currentSession.id 
+            ? { ...session, messages: [...session.messages, newMessage] }
+            : session
+        )
+      );
+      
+      setCurrentSession(prev => 
+        prev ? { ...prev, messages: [...prev.messages, newMessage] } : null
+      );
 
       // Update session title if this is the first message
       if (messages.length === 0) {
@@ -378,81 +493,150 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-      {/* Sidebar */}
-      <div className="w-80 bg-white/80 backdrop-blur-sm shadow-xl border-r border-gray-200 flex flex-col">
-        <div className="p-6 border-b border-gray-200">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-            TikTok Assistant
-          </h1>
-          <p className="text-sm text-gray-600 mt-1">Welcome back, {user.username}!</p>
-          <button
-            onClick={createNewSession}
-            className="mt-3 w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200 text-sm"
-          >
-            + New Chat
-          </button>
+    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+      {/* Header */}
+      <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center space-x-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                TikTok Assistant
+              </h1>
+              <p className="text-sm text-gray-600">AI-powered content creation platform</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <div className="text-right">
+              <p className="text-sm font-medium text-gray-900">Welcome back!</p>
+              <p className="text-xs text-gray-600">@{user.username}</p>
+            </div>
+            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-semibold">
+                {user.username.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-200 text-sm font-medium"
+            >
+              Logout
+            </button>
+          </div>
         </div>
+      </header>
 
-        {/* Chat Sessions List */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Recent Chats</h3>
-            <div className="space-y-2">
-              {sessions.map((session) => (
-                <button
-                  key={session.id}
-                  onClick={() => switchToSession(session)}
-                  className={`w-full text-left p-3 rounded-lg transition-colors duration-200 ${
-                    currentSession?.id === session.id
-                      ? 'bg-indigo-100 border border-indigo-200'
-                      : 'bg-gray-50 hover:bg-gray-100 border border-transparent'
-                  }`}
-                >
-                  <div className="font-medium text-gray-900 text-sm truncate">
-                    {session.title}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {new Date(session.updated_at).toLocaleDateString()}
-                  </div>
-                </button>
-              ))}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <div className="w-80 bg-white/80 backdrop-blur-sm shadow-xl border-r border-gray-200 flex flex-col">
+          <div className="p-6 border-b border-gray-200">
+            <button
+              onClick={createNewSession}
+              className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 text-sm font-medium shadow-lg hover:shadow-xl transform hover:scale-105"
+            >
+              <span className="mr-2">✨</span>
+              Start New Chat
+            </button>
+          </div>
+
+          {/* Chat Sessions List */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center">
+                <svg className="w-4 h-4 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                Recent Chats
+              </h3>
+              <div className="space-y-2">
+                {sessions.map((session) => (
+                  <button
+                    key={session.id}
+                    onClick={() => switchToSession(session)}
+                    className={`w-full text-left p-4 rounded-xl transition-all duration-200 group hover:shadow-md ${
+                      currentSession?.id === session.id
+                        ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 shadow-sm'
+                        : 'bg-white/60 hover:bg-white border border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className={`font-medium text-sm truncate ${
+                          currentSession?.id === session.id 
+                            ? 'text-indigo-900' 
+                            : 'text-gray-900 group-hover:text-gray-700'
+                        }`}>
+                          {session.title}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1 flex items-center">
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {new Date(session.updated_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                      {session.messages && session.messages.length > 0 && (
+                        <div className="ml-2 px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
+                          {session.messages.length}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
         
-        {/* View Mode Tabs */}
-        <div className="flex p-4 space-x-2">
-          <button
-            onClick={() => setViewMode('chat')}
-            className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all duration-200 ${
-              viewMode === 'chat' 
-                ? 'bg-indigo-600 text-white shadow-lg transform scale-105' 
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Chat
-          </button>
-          <button
-            onClick={() => setViewMode('gallery')}
-            className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all duration-200 ${
-              viewMode === 'gallery' 
-                ? 'bg-indigo-600 text-white shadow-lg transform scale-105' 
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Gallery
-          </button>
-          <button
-            onClick={() => setViewMode('notes')}
-            className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all duration-200 ${
-              viewMode === 'notes' 
-                ? 'bg-indigo-600 text-white shadow-lg transform scale-105' 
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Notes
-          </button>
+          {/* View Mode Tabs */}
+          <div className="border-t border-gray-200 p-4">
+            <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl">
+              <button
+                onClick={() => setViewMode('chat')}
+                className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all duration-200 text-sm flex items-center justify-center ${
+                  viewMode === 'chat' 
+                    ? 'bg-white text-indigo-600 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                Chat
+              </button>
+              <button
+                onClick={() => setViewMode('gallery')}
+                className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all duration-200 text-sm flex items-center justify-center ${
+                  viewMode === 'gallery' 
+                    ? 'bg-white text-indigo-600 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Gallery
+              </button>
+              <button
+                onClick={() => setViewMode('notes')}
+                className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all duration-200 text-sm flex items-center justify-center ${
+                  viewMode === 'notes' 
+                    ? 'bg-white text-indigo-600 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Notes
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Notes Section */}
@@ -475,19 +659,8 @@ export default function ChatPage() {
           </div>
         )}
 
-        {/* Logout Button */}
-        <div className="p-4 border-t border-gray-200">
-          <button
-            onClick={handleLogout}
-            className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col">
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col bg-white/50">
         {/* Chat View */}
         {viewMode === 'chat' && (
           <>
@@ -674,6 +847,7 @@ export default function ChatPage() {
             )}
           </div>
         )}
+        </div>
       </div>
 
       {/* Video Modal */}

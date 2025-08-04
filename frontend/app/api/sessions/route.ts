@@ -87,10 +87,10 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
-    if (error) {
-      console.error('Database error:', error);
+    if (error || !session) {
+      console.error('Database error creating session:', error);
       return NextResponse.json(
-        { detail: "Failed to create session" },
+        { detail: "Failed to create session", error: error?.message },
         { status: 500 }
       );
     }

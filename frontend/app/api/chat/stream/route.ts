@@ -77,41 +77,26 @@ User: ${username}`;
             }
             
             // Save the complete message to database after streaming
-            await supabase
+            const { error: saveError } = await supabase
               .from('messages')
               .insert({
                 user_id: user.id,
                 session_id: sessionId,
                 content: message,
                 response: fullResponse
-              })
-              .select()
-              .single();
+              });
 
-            // Update session's updated_at timestamp and create a note if it's the first message
+            if (saveError) {
+              console.error('Failed to save message:', saveError);
+            }
+
+            // Update session's updated_at timestamp
             if (sessionId) {
               await supabase
                 .from('chat_sessions')
                 .update({ updated_at: new Date().toISOString() })
                 .eq('id', sessionId)
                 .eq('user_id', user.id);
-
-              // Check if this is the first message in the session
-              const { data: messageCount } = await supabase
-                .from('messages')
-                .select('id', { count: 'exact' })
-                .eq('session_id', sessionId);
-
-              // Create a session summary note if this is the first or few messages
-              if (messageCount && Array.isArray(messageCount) && messageCount.length === 1) {
-                await supabase
-                  .from('notes')
-                  .insert({
-                    session_id: sessionId,
-                    title: "Session Summary",
-                    content: `Chat started with: "${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`
-                  });
-              }
             }
             
             const doneData = `data: {"done": true}\n\n`;

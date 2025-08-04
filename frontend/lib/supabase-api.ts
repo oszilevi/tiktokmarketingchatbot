@@ -99,6 +99,18 @@ export const chatApi = {
     }
   },
 
+  getSession: async (sessionId: number) => {
+    try {
+      console.log('API: Fetching single session:', sessionId);
+      const response = await api.get(`/sessions/${sessionId}`);
+      console.log('API: Session response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('API: Failed to fetch session:', error);
+      throw error;
+    }
+  },
+
   createSession: async (title?: string) => {
     try {
       const response = await api.post('/sessions', { title });
