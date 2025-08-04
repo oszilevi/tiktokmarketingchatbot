@@ -265,7 +265,6 @@ export default function ChatPage() {
 
       // Stream the AI response (ONLY ONE API CALL)
       let fullResponse = '';
-      let isFirstChunk = true;
       await chatApi.sendMessageStream(messageText, currentSession.id, (chunk) => {
         fullResponse += chunk;
         setMessages(prev => 
@@ -273,11 +272,10 @@ export default function ChatPage() {
             msg.id === botMessage.id ? { 
               ...msg, 
               text: fullResponse,
-              status: isFirstChunk ? undefined : msg.status // Remove thinking status on first chunk
+              status: undefined // Clear thinking status when content arrives
             } : msg
           )
         );
-        isFirstChunk = false;
       });
 
       // Update the session's messages array with the new message
