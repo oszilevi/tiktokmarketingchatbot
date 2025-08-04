@@ -330,7 +330,7 @@ export default function ChatPage() {
       // Save videos to current session
       if (currentSession) {
         chatApi.updateSession(currentSession.id, { gallery_videos: sampleVideos })
-          .then(updatedSession => {
+          .then(() => {
             // Update local session state
             setSessions(prev => 
               prev.map(session => 

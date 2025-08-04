@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { Video } from '@/types/video';
 
 export async function PATCH(
   request: NextRequest,
@@ -31,7 +32,7 @@ export async function PATCH(
     const sessionId = parseInt(params.id);
 
     // Update the session
-    const updateData: any = {
+    const updateData: { updated_at: string; title?: string; gallery_videos?: Video[] } = {
       updated_at: new Date().toISOString()
     };
 

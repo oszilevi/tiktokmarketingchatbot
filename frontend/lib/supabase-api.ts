@@ -109,7 +109,7 @@ export const chatApi = {
     }
   },
 
-  updateSession: async (sessionId: number, updates: { title?: string; gallery_videos?: any[] }) => {
+  updateSession: async (sessionId: number, updates: { title?: string; gallery_videos?: unknown[] }) => {
     try {
       const response = await api.patch(`/sessions/${sessionId}`, updates);
       return response.data;

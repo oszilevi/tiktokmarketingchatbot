@@ -77,7 +77,7 @@ User: ${username}`;
             }
             
             // Save the complete message to database after streaming
-            const { data: savedMessage } = await supabase
+            await supabase
               .from('messages')
               .insert({
                 user_id: user.id,
@@ -103,7 +103,7 @@ User: ${username}`;
                 .eq('session_id', sessionId);
 
               // Create a session summary note if this is the first or few messages
-              if (messageCount && (messageCount as any).length === 1) {
+              if (messageCount && Array.isArray(messageCount) && messageCount.length === 1) {
                 await supabase
                   .from('notes')
                   .insert({
