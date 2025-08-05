@@ -168,7 +168,7 @@ export async function DELETE(
     const sessionId = parseInt(id);
     console.log('DELETE: sessionId =', sessionId, 'user_id =', user.id);
 
-    // Delete associated messages first (cascade should handle this, but being explicit)
+    // Delete associated messages first (REQUIRED due to foreign key constraint)
     console.log('DELETE: Deleting messages...');
     const { error: messagesError } = await supabase
       .from('messages')
@@ -176,7 +176,13 @@ export async function DELETE(
       .eq('session_id', sessionId)
       .eq('user_id', user.id);
     
-    if (messagesError) console.log('DELETE: Messages error:', messagesError);
+    if (messagesError) {
+      console.error('DELETE: Messages error:', messagesError);
+      return NextResponse.json(
+        { detail: "Failed to delete messages" },
+        { status: 500 }
+      );
+    }
 
     // Delete associated notes
     console.log('DELETE: Deleting notes...');
@@ -186,9 +192,15 @@ export async function DELETE(
       .eq('session_id', sessionId)
       .eq('user_id', user.id);
       
-    if (notesError) console.log('DELETE: Notes error:', notesError);
+    if (notesError) {
+      console.error('DELETE: Notes error:', notesError);
+      return NextResponse.json(
+        { detail: "Failed to delete notes" },
+        { status: 500 }
+      );
+    }
 
-    // Delete the session
+    // Now delete the session (should work since references are gone)
     console.log('DELETE: Deleting session...');
     const { error } = await supabase
       .from('chat_sessions')
