@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // const username = user.user_metadata?.username || user.email?.split('@')[0] || 'user'; // Not needed for placeholder responses
+    const username = user.user_metadata?.username || user.email?.split('@')[0] || 'user';
 
     // Placeholder responses
     const placeholderResponses = [
