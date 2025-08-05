@@ -4,13 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { authApi, chatApi } from '@/lib/supabase-api';
-import { 
-  NotesManager, 
-  NoteEditor, 
-  EnhancedNote, 
-  NoteCategory, 
-  NoteTag 
-} from '@/components/notes';
+// import { 
+//   NotesManager, 
+//   NoteEditor, 
+//   EnhancedNote, 
+//   NoteCategory, 
+//   NoteTag 
+// } from '@/components/notes';
 
 interface Message {
   id: number;
@@ -81,7 +81,7 @@ interface ChatSession {
   }>;
   notes: Array<{
     id: number;
-    title: string;
+    title: string; 
     content: string;
   }>;
 }
@@ -365,136 +365,6 @@ const TipsCard: React.FC<TipsCardProps> = ({
   );
 };
 
-// Enhanced Notes View Component
-interface EnhancedNotesViewProps {
-  sessionId?: number;
-  messages: Message[];
-  onCreateNote: (note: Partial<EnhancedNote>) => Promise<void>;
-  onSaveNote: (note: Partial<EnhancedNote>) => Promise<void>;
-  onDeleteNote: (noteId: string) => Promise<void>;
-  onLinkToMessage: (noteId: string, messageId: string, context?: string) => Promise<void>;
-}
-
-const EnhancedNotesView: React.FC<EnhancedNotesViewProps> = ({
-  sessionId,
-  messages,
-  onCreateNote,
-  onSaveNote,
-  onDeleteNote,
-  onLinkToMessage,
-}) => {
-  const [viewMode, setViewMode] = useState<'manager' | 'editor'>('manager');
-  const [currentNote, setCurrentNote] = useState<EnhancedNote | null>(null);
-  const [showEditor, setShowEditor] = useState(false);
-
-  const handleNewNote = () => {
-    setCurrentNote(null);
-    setShowEditor(true);
-    setViewMode('editor');
-  };
-
-  const handleEditNote = (note: EnhancedNote) => {
-    setCurrentNote(note);
-    setShowEditor(true);
-    setViewMode('editor');
-  };
-
-  const handleSaveNote = async (noteData: Partial<EnhancedNote>) => {
-    await onSaveNote(noteData);
-    setShowEditor(false);
-    setViewMode('manager');
-    setCurrentNote(null);
-  };
-
-  const handleCancelEdit = () => {
-    setShowEditor(false);
-    setViewMode('manager');
-    setCurrentNote(null);
-  };
-
-  const handleCreateFromMessage = (message: Message) => {
-    const noteContent = message.contentType === 'script' && message.content 
-      ? `<h1>${message.content.title}</h1>\n<p>${message.content.description}</p>`
-      : `<p>${message.text}</p>`;
-
-    const noteData: Partial<EnhancedNote> = {
-      title: message.content?.title || `Note from chat ${new Date().toLocaleDateString()}`,
-      content: noteContent,
-      plainTextContent: message.content?.description || message.text,
-      linked_chat_message_id: message.id.toString(),
-      metadata: {
-        source: 'auto-generated',
-        ai_generated: !message.isUser,
-        version: 1,
-      },
-    };
-
-    setCurrentNote(noteData as EnhancedNote);
-    setShowEditor(true);
-    setViewMode('editor');
-  };
-
-  if (showEditor) {
-    return (
-      <div className="h-full">
-        <NoteEditor
-          note={currentNote || undefined}
-          onSave={handleSaveNote}
-          onCancel={handleCancelEdit}
-          showTemplateSelector={!currentNote}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="h-full">
-      <NotesManager
-        initialViewMode="card"
-        showCategories={true}
-        showTags={true}
-        allowBulkOperations={true}
-        maxNotesPerPage={20}
-      />
-      
-      {/* Floating Action Button */}
-      <button
-        onClick={handleNewNote}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-40"
-        title="Create new note"
-      >
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-      </button>
-
-      {/* Quick Note from Messages */}
-      {messages.length > 0 && (
-        <div className="fixed bottom-24 right-6 max-w-xs">
-          <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
-            <p className="text-sm font-medium text-gray-700 mb-2">Create note from recent messages:</p>
-            <div className="space-y-1 max-h-32 overflow-y-auto">
-              {messages.slice(-3).reverse().map(message => (
-                <button
-                  key={message.id}
-                  onClick={() => handleCreateFromMessage(message)}
-                  className="w-full text-left p-2 text-xs text-gray-600 hover:bg-gray-50 rounded border-l-2 border-transparent hover:border-blue-500 transition-colors"
-                >
-                  <span className="font-medium">
-                    {message.isUser ? 'Your message' : 'AI response'}
-                  </span>
-                  <p className="truncate mt-1">
-                    {message.content?.title || message.text.substring(0, 50)}...
-                  </p>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
 
 export default function ChatPage() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -1329,7 +1199,7 @@ Pro Tips:
   const handleOpenInNotes = async (content: Message['content']) => {
     try {
       // Create a new note from the message content
-      const noteData: Partial<EnhancedNote> = {
+      const noteData = {
         title: content?.title || 'Script from Chat',
         content: content?.description ? `<h1>${content.title}</h1>\n<p>${content.description}</p>` : '<p>No content available</p>',
         plainTextContent: content?.description || '',
@@ -1356,82 +1226,17 @@ Pro Tips:
     }
   };
 
-  // Enhanced Notes System Handlers
-  const handleCreateNote = async (note: Partial<EnhancedNote>) => {
-    try {
-      // Here you would implement the actual API call to create a note
-      console.log('Creating note:', note);
-      
-      // For demonstration, we'll simulate an API call
-      const newNote: EnhancedNote = {
-        id: `note_${Date.now()}`,
-        title: note.title || 'Untitled Note',
-        content: note.content || '',
-        plainTextContent: note.plainTextContent || '',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        tags: note.tags || [],
-        is_pinned: note.is_pinned || false,
-        is_archived: note.is_archived || false,
-        is_public: note.is_public || false,
-        word_count: note.word_count || 0,
-        reading_time_minutes: note.reading_time_minutes || 1,
-        metadata: {
-          source: 'manual',
-          version: 1,
-          ...note.metadata,
-        },
-        ...note,
-      };
-
-      // You would typically make an API call here to save to your backend
-      // await chatApi.createNote(currentSession?.id, newNote);
-      
-      console.log('Note created successfully:', newNote);
-    } catch (error) {
-      console.error('Failed to create note:', error);
-      throw error;
-    }
+  // Simple Notes System Handlers (placeholder)
+  const handleCreateNote = async (note: any) => {
+    console.log('Note creation feature coming soon:', note);
   };
 
-  const handleSaveNote = async (note: Partial<EnhancedNote>) => {
-    try {
-      console.log('Saving note:', note);
-      
-      if (note.id) {
-        // Update existing note
-        // await chatApi.updateNote(note.id, note);
-        console.log('Note updated successfully');
-      } else {
-        // Create new note
-        await handleCreateNote(note);
-      }
-    } catch (error) {
-      console.error('Failed to save note:', error);
-      throw error;
-    }
+  const handleUpdateNote = async (noteId: string, note: any) => {
+    console.log('Note update feature coming soon:', noteId, note);
   };
 
   const handleDeleteNote = async (noteId: string) => {
-    try {
-      console.log('Deleting note:', noteId);
-      // await chatApi.deleteNote(noteId);
-      console.log('Note deleted successfully');
-    } catch (error) {
-      console.error('Failed to delete note:', error);
-      throw error;
-    }
-  };
-
-  const handleLinkNoteToMessage = async (noteId: string, messageId: string, context?: string) => {
-    try {
-      console.log('Linking note to message:', { noteId, messageId, context });
-      // await chatApi.linkNoteToMessage(noteId, messageId, context);
-      console.log('Note linked to message successfully');
-    } catch (error) {
-      console.error('Failed to link note to message:', error);
-      throw error;
-    }
+    console.log('Note deletion feature coming soon:', noteId);
   };
 
   const handleRegenerateScript = (originalPrompt: string) => {
@@ -1775,16 +1580,21 @@ Pro Tips:
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col bg-white/50">
 
-          {/* Enhanced Notes View */}
+          {/* Notes View */}
           {viewMode === 'notes' && (
-            <EnhancedNotesView 
-              sessionId={currentSession?.id}
-              messages={messages}
-              onCreateNote={handleCreateNote}
-              onSaveNote={handleSaveNote}
-              onDeleteNote={handleDeleteNote}
-              onLinkToMessage={handleLinkNoteToMessage}
-            />
+            <div className="flex-1 flex items-center justify-center p-6">
+              <div className="text-center max-w-md">
+                <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Notes Coming Soon</h3>
+                <p className="text-gray-600">
+                  This feature will help you organize and save important insights from your conversations.
+                </p>
+              </div>
+            </div>
           )}
 
         {/* Chat View */}
