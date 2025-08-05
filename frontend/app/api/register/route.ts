@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
 
     console.log('Email is allowed, proceeding with registration');
 
+    console.log('Attempting Supabase auth signup with:', { email, username });
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -51,12 +52,25 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    console.log('Supabase signup result:', { data: data?.user?.id ? 'User created' : 'No user', error });
+
     if (error) {
+      console.error('Supabase auth error:', error);
       return NextResponse.json(
-        { detail: error.message },
+        { detail: `Registration failed: ${error.message}` },
         { status: 400 }
       );
     }
+
+    if (!data.user) {
+      console.error('No user returned from signup');
+      return NextResponse.json(
+        { detail: "Registration failed: No user created" },
+        { status: 400 }
+      );
+    }
+
+    console.log('Registration successful for user:', data.user.id);
 
     return NextResponse.json({ 
       message: "User created successfully",
