@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { createUserScopedClient } from '@/lib/supabase-server';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'your-openai-api-key-here',
-});
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,43 +35,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const username = user.user_metadata?.username || user.email?.split('@')[0] || 'user';
+    // const username = user.user_metadata?.username || user.email?.split('@')[0] || 'user'; // Not needed for placeholder responses
 
-    const systemPrompt = `You are a helpful TikTok content creation assistant. You help users create engaging TikTok content, provide tips, and give creative suggestions. 
+    // Placeholder responses for different types of questions
+    const placeholderResponses = [
+      "That's a great question about TikTok content! Here are some tips to help you create engaging videos that could go viral...",
+      "I love your enthusiasm for TikTok creation! Let me share some trending ideas that are perfect for your style...",
+      "Excellent thinking! For TikTok success, remember to focus on the first 3 seconds - they're crucial for viewer retention...",
+      "Your content strategy sounds amazing! Here's how you can optimize it for maximum engagement on TikTok...",
+      "That's a creative approach! TikTok's algorithm loves authentic content, so keep being yourself while following these best practices..."
+    ];
 
-Your responses should be:
-- Engaging and conversational
-- Focused on TikTok content creation
-- Helpful with practical tips
-- Creative and inspiring
-
-User: ${username}`;
+    // Select a random response
+    const selectedResponse = placeholderResponses[Math.floor(Math.random() * placeholderResponses.length)];
 
     try {
-      const stream = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
-        ],
-        max_tokens: 500,
-        temperature: 0.7,
-        stream: true
-      });
-
       const encoder = new TextEncoder();
       let fullResponse = '';
 
       const readableStream = new ReadableStream({
         async start(controller) {
           try {
-            for await (const chunk of stream) {
-              const content = chunk.choices[0]?.delta?.content;
-              if (content) {
-                fullResponse += content;
-                const data = `data: ${JSON.stringify({ chunk: content })}\n\n`;
-                controller.enqueue(encoder.encode(data));
-              }
+            // Wait 1 second to show thinking animation
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Simulate streaming by chunking the response
+            const words = selectedResponse.split(' ');
+            
+            for (let i = 0; i < words.length; i++) {
+              const chunk = words[i] + (i < words.length - 1 ? ' ' : '');
+              fullResponse += chunk;
+              const data = `data: ${JSON.stringify({ chunk })}\n\n`;
+              controller.enqueue(encoder.encode(data));
+              
+              // Small delay between chunks to simulate streaming
+              await new Promise(resolve => setTimeout(resolve, 50));
             }
             
             // Save the complete message to database after streaming

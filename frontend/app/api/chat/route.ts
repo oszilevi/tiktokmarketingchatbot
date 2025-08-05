@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { createUserScopedClient } from '@/lib/supabase-server';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'your-openai-api-key-here',
-});
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,30 +35,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const username = user.user_metadata?.username || user.email?.split('@')[0] || 'user';
+    // const username = user.user_metadata?.username || user.email?.split('@')[0] || 'user'; // Not needed for placeholder responses
 
-    const systemPrompt = `You are a helpful TikTok content creation assistant. You help users create engaging TikTok content, provide tips, and give creative suggestions. 
-
-Your responses should be:
-- Engaging and conversational
-- Focused on TikTok content creation
-- Helpful with practical tips
-- Creative and inspiring
-
-User: ${username}`;
+    // Placeholder responses
+    const placeholderResponses = [
+      "That's a great question about TikTok content! Here are some tips to help you create engaging videos that could go viral...",
+      "I love your enthusiasm for TikTok creation! Let me share some trending ideas that are perfect for your style...",
+      "Excellent thinking! For TikTok success, remember to focus on the first 3 seconds - they're crucial for viewer retention...",
+      "Your content strategy sounds amazing! Here's how you can optimize it for maximum engagement on TikTok...",
+      "That's a creative approach! TikTok's algorithm loves authentic content, so keep being yourself while following these best practices..."
+    ];
 
     try {
-      const response = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
-        ],
-        max_tokens: 500,
-        temperature: 0.7
-      });
-
-      const gptResponse = response.choices[0].message.content?.trim() || 'Sorry, I could not generate a response.';
+      // Wait 1 second to simulate thinking
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Select a random response
+      const gptResponse = placeholderResponses[Math.floor(Math.random() * placeholderResponses.length)];
 
       // Save message to database
       const { data: savedMessage, error: saveError } = await supabase
@@ -107,11 +95,11 @@ User: ${username}`;
           content: noteContent
         }
       });
-    } catch (openaiError) {
-      console.error('OpenAI API Error:', openaiError);
-      const fallbackResponse = `I'm having trouble connecting to my AI brain right now. But I can still help you with TikTok content! You said: '${message}'. What kind of TikTok content are you looking to create?`;
+    } catch (error) {
+      console.error('Chat Error:', error);
+      const fallbackResponse = `I'm having trouble processing your request right now. But I can still help you with TikTok content! What kind of videos are you looking to create?`;
       
-      // Still save the message even if OpenAI fails
+      // Still save the message even if error occurs
       const { data: savedMessage } = await supabase
         .from('messages')
         .insert({
