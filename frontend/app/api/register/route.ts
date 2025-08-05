@@ -41,15 +41,18 @@ export async function POST(request: NextRequest) {
     console.log('Email is allowed, proceeding with registration');
 
     console.log('Attempting Supabase auth signup with:', { email, username });
+    
+    // Try a simpler signup first without user metadata
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: {
-          username: username,
-          display_name: username
-        }
-      }
+      // Remove options temporarily to isolate the issue
+      // options: {
+      //   data: {
+      //     username: username,
+      //     display_name: username
+      //   }
+      // }
     });
 
     console.log('Supabase signup result:', { data: data?.user?.id ? 'User created' : 'No user', error });
@@ -71,6 +74,31 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Registration successful for user:', data.user.id);
+
+    // Try to create a user profile record manually if it doesn't exist
+    try {
+      console.log('Attempting to create user profile...');
+      const { data: profileData, error: profileError } = await supabase
+        .from('users')
+        .upsert({
+          id: data.user.id,
+          email: email,
+          username: username,
+          display_name: username,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'id'
+        });
+      
+      if (profileError) {
+        console.log('Profile creation failed (this might be expected):', profileError.message);
+      } else {
+        console.log('User profile created successfully');
+      }
+    } catch (profileErr) {
+      console.log('Profile creation attempt failed (this might be expected):', profileErr);
+    }
 
     return NextResponse.json({ 
       message: "User created successfully",

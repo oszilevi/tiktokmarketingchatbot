@@ -41,7 +41,26 @@ export default function LoginPage() {
     } catch (err) {
       console.error('Login/Register error:', err);
       const error = err as { response?: { data?: { detail?: string } }; message?: string };
-      setError(error.response?.data?.detail || error.message || 'An error occurred');
+      const errorMessage = error.response?.data?.detail || error.message || 'An error occurred';
+      
+      // Make error messages more user-friendly
+      let friendlyMessage = errorMessage;
+      
+      if (errorMessage.includes('not authorized to register')) {
+        friendlyMessage = '🚫 This email address is not authorized to create an account. Please contact your administrator to request access.';
+      } else if (errorMessage.includes('User already exists') || errorMessage.includes('already registered')) {
+        friendlyMessage = '👤 An account with this email already exists. Try logging in instead.';
+      } else if (errorMessage.includes('Invalid login credentials')) {
+        friendlyMessage = '❌ Invalid email or password. Please check your credentials and try again.';
+      } else if (errorMessage.includes('Email not confirmed')) {
+        friendlyMessage = '📧 Please check your email and click the confirmation link before logging in.';
+      } else if (errorMessage.includes('Password should be at least')) {
+        friendlyMessage = '🔒 Password must be at least 6 characters long.';
+      } else if (errorMessage.includes('Network') || errorMessage.includes('fetch')) {
+        friendlyMessage = '🌐 Connection error. Please check your internet connection and try again.';
+      }
+      
+      setError(friendlyMessage);
     } finally {
       setLoading(false);
     }
