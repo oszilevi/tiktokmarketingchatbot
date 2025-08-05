@@ -131,6 +131,16 @@ export const chatApi = {
     }
   },
 
+  deleteSession: async (sessionId: number) => {
+    try {
+      const response = await api.delete(`/sessions/${sessionId}`);
+      return response.data;
+    } catch (error) {
+      console.error('API: Failed to delete session:', error);
+      throw error;
+    }
+  },
+
   getMessages: async () => {
     try {
       console.log('API: Fetching messages...');

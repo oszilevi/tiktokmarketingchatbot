@@ -133,3 +133,73 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const authHeader = request.headers.get('authorization');
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { detail: "Missing or invalid authorization header" },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.substring(7);
+
+    // Create user-scoped Supabase client
+    const supabase = createUserScopedClient(token);
+
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json(
+        { detail: "Invalid token" },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
+    const sessionId = parseInt(id);
+
+    // Delete associated messages first (cascade should handle this, but being explicit)
+    await supabase
+      .from('messages')
+      .delete()
+      .eq('session_id', sessionId)
+      .eq('user_id', user.id);
+
+    // Delete associated notes
+    await supabase
+      .from('notes')
+      .delete()
+      .eq('session_id', sessionId)
+      .eq('user_id', user.id);
+
+    // Delete the session
+    const { error } = await supabase
+      .from('chat_sessions')
+      .delete()
+      .eq('id', sessionId)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Database error deleting session:', error);
+      return NextResponse.json(
+        { detail: "Failed to delete session" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ message: "Session deleted successfully" });
+  } catch {
+    return NextResponse.json(
+      { detail: "Invalid request" },
+      { status: 400 }
+    );
+  }
+}
