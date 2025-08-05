@@ -168,20 +168,20 @@ export async function DELETE(
     const sessionId = parseInt(id);
     console.log('DELETE: sessionId =', sessionId, 'user_id =', user.id);
 
-    // Check how many messages exist first
-    const { count: messageCount } = await supabase
+    // Check what messages actually exist and their user_ids
+    const { data: existingMessages } = await supabase
       .from('messages')
-      .select('*', { count: 'exact', head: true })
+      .select('id, user_id, session_id')
       .eq('session_id', sessionId);
-    console.log('DELETE: Found', messageCount, 'messages for session', sessionId);
+    console.log('DELETE: Found messages:', existingMessages);
 
     // Delete associated messages first (REQUIRED due to foreign key constraint)
+    // Since we already verified the session belongs to the user, we can delete all messages for this session
     console.log('DELETE: Deleting messages...');
     const { error: messagesError, count: deletedCount } = await supabase
       .from('messages')
       .delete({ count: 'exact' })
-      .eq('session_id', sessionId)
-      .eq('user_id', user.id);
+      .eq('session_id', sessionId);
     
     console.log('DELETE: Deleted', deletedCount, 'messages');
     
