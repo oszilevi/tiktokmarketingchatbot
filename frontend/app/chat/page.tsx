@@ -682,6 +682,23 @@ export default function ChatPage() {
     };
   }, [selectedVideo, currentSession?.gallery_videos]);
 
+  // Mobile viewport height fix for iPhone 13 Pro and similar devices
+  useEffect(() => {
+    const setVH = () => {
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    };
+
+    setVH();
+    window.addEventListener('resize', setVH);
+    window.addEventListener('orientationchange', setVH);
+
+    return () => {
+      window.removeEventListener('resize', setVH);
+      window.removeEventListener('orientationchange', setVH);
+    };
+  }, []);
+
   // Enhanced Gallery Utility Functions
   const filterAndSortVideos = (videos: Video[]) => {
     let filteredVideos = videos;
@@ -1391,9 +1408,9 @@ Pro Tips:
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50" style={{ height: '100vh', minHeight: '100vh' }}>
+    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dynamic-island-safe" style={{ height: '100vh', minHeight: '100vh' }}>
       {/* Consolidated Header with Navigation */}
-      <header className="bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
+      <header className="bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm safe-area-inset">
         <div className="flex items-center justify-between px-4 md:px-6 py-2 md:py-3">
           <div className="flex items-center space-x-3">
             {/* Mobile menu button */}
@@ -1492,7 +1509,7 @@ Pro Tips:
         </div>
 
         {/* Mobile Navigation Tabs */}
-        <div className="md:hidden border-t border-gray-200 px-4 py-2">
+        <div className="md:hidden border-t border-gray-200 px-4 py-2 mobile-nav">
           <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl">
             <button
               onClick={() => setViewMode('chat')}
@@ -1547,7 +1564,7 @@ Pro Tips:
         )}
         
         {/* Sidebar */}
-        <div className={`fixed lg:relative inset-y-0 left-0 z-50 lg:z-0 w-80 min-w-80 bg-white/95 lg:bg-white/80 backdrop-blur-sm shadow-xl border-r border-gray-200 flex flex-col transform transition-transform duration-300 ${
+        <div className={`fixed lg:relative inset-y-0 left-0 z-50 lg:z-0 w-80 min-w-80 bg-white/95 lg:bg-white/80 backdrop-blur-sm shadow-xl border-r border-gray-200 flex flex-col transform transition-transform duration-300 safe-area-inset ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}>
           <div className="p-6 border-b border-gray-200 flex-shrink-0">
@@ -1641,7 +1658,7 @@ Pro Tips:
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col bg-white/50">
+        <div className="flex-1 flex flex-col bg-white/50 chat-container">
 
           {/* Notes View */}
           {viewMode === 'notes' && (
@@ -1664,8 +1681,8 @@ Pro Tips:
         {viewMode === 'chat' && (
           <>
             {/* Messages Container */}
-            <div className="flex-1 overflow-y-auto px-3 md:px-4 py-4 md:py-6">
-              <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
+            <div className="flex-1 overflow-y-auto px-3 md:px-4 py-4 md:py-6 chat-messages-area">
+              <div className="max-w-4xl mx-auto space-y-4 md:space-y-6 w-full">
                 {messages.length === 0 ? (
                   <div className="text-center py-16">
                     <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full mb-6 animate-pulse">
@@ -1700,8 +1717,8 @@ Pro Tips:
                       key={message.id}
                       className={`flex ${message.isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}
                     >
-                      <div className={`max-w-[85%] sm:max-w-md md:max-w-2xl ${message.isUser ? 'order-1' : 'order-2'}`}>
-                        <div className={`px-4 py-3 md:px-6 md:py-4 rounded-2xl shadow-sm text-sm md:text-base ${
+                      <div className={`max-w-[85%] sm:max-w-md md:max-w-2xl w-full ${message.isUser ? 'order-1' : 'order-2'}`}>
+                        <div className={`px-4 py-3 md:px-6 md:py-4 rounded-2xl shadow-sm text-sm md:text-base break-words ${
                           message.isUser 
                             ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white' 
                             : 'bg-white border border-gray-200'
@@ -1827,7 +1844,7 @@ Pro Tips:
             </div>
 
             {/* Input Form */}
-            <form onSubmit={handleSendMessage} className="p-3 md:p-6 bg-white/80 backdrop-blur-sm border-t border-gray-200">
+            <form onSubmit={handleSendMessage} className="p-3 md:p-6 bg-white/80 backdrop-blur-sm border-t border-gray-200 mobile-input-area">
               <div className="max-w-4xl mx-auto">
                 {/* Prompt Control Chips */}
                 <div className="mb-4 overflow-x-auto">
@@ -1916,7 +1933,7 @@ Pro Tips:
                   <button
                     type="submit"
                     disabled={loading || !inputMessage.trim()}
-                    className="px-4 py-3 md:px-8 md:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-full hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 text-sm md:text-base flex items-center justify-center min-w-[48px]"
+                    className="px-4 py-3 md:px-8 md:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-full hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 text-sm md:text-base flex items-center justify-center min-w-[48px] md:min-w-[80px]"
                   >
                     {loading ? (
                       <div className="animate-spin rounded-full h-4 w-4 md:h-5 md:w-5 border-2 border-white border-t-transparent" />
