@@ -63,6 +63,7 @@ export default function ChatPage() {
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null);
+  const [deletedSessionIds, setDeletedSessionIds] = useState<Set<number>>(new Set());
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [contextualChips, setContextualChips] = useState<Array<{label: string, prompt: string, color: string}>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -92,11 +93,13 @@ export default function ChatPage() {
           return;
         }
         
-        setSessions(sessionData);
+        // Filter out any sessions that were deleted in this session
+        const filteredSessionData = sessionData.filter(s => !deletedSessionIds.has(s.id));
+        setSessions(filteredSessionData);
         
         // Set current session to the most recent one, or create a new one if none exist
-        if (sessionData.length > 0) {
-          const mostRecent = sessionData[0]; // Already sorted by updated_at desc
+        if (filteredSessionData.length > 0) {
+          const mostRecent = filteredSessionData[0]; // Already sorted by updated_at desc
           setCurrentSession(mostRecent);
           loadSessionMessages(mostRecent);
         } else {
@@ -115,7 +118,7 @@ export default function ChatPage() {
     };
 
     initializeChat();
-  }, [router]);
+  }, [router, deletedSessionIds]);
 
   // Load messages for a specific session
   const loadSessionMessages = (session: ChatSession) => {
@@ -206,6 +209,9 @@ export default function ChatPage() {
       // Delete from database
       await chatApi.deleteSession(sessionId);
       
+      // Track this session as deleted to prevent refresh from bringing it back
+      setDeletedSessionIds(prev => new Set([...prev, sessionId]));
+      
       // Remove from local state after successful deletion
       setSessions(prev => prev.filter(s => s.id !== sessionId));
       setDeletingSessionId(null);
@@ -230,10 +236,12 @@ export default function ChatPage() {
         try {
           const freshSessions = await chatApi.getSessions();
           if (freshSessions && Array.isArray(freshSessions)) {
-            setSessions(freshSessions);
+            // Filter out sessions that we've deleted locally
+            const filteredSessions = freshSessions.filter(s => !deletedSessionIds.has(s.id));
+            setSessions(filteredSessions);
             
             // Update current session if it exists in fresh data
-            const freshCurrentSession = freshSessions.find(s => s.id === currentSession.id);
+            const freshCurrentSession = filteredSessions.find(s => s.id === currentSession.id);
             if (freshCurrentSession && freshCurrentSession.messages.length !== currentSession.messages.length) {
               setCurrentSession(freshCurrentSession);
               loadSessionMessages(freshCurrentSession);
@@ -246,7 +254,7 @@ export default function ChatPage() {
     }, 30000); // Check every 30 seconds
 
     return () => clearInterval(refreshInterval);
-  }, [currentSession]);
+  }, [currentSession, deletedSessionIds]);
 
   // Track user activity
   useEffect(() => {
