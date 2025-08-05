@@ -446,21 +446,71 @@ export default function ChatPage() {
 
   // Load messages for a specific session
   const loadSessionMessages = (session: ChatSession) => {
-    const formattedMessages = session.messages.flatMap((msg) => [
-      {
-        id: msg.id * 2,
-        text: msg.content,
-        isUser: true,
-        timestamp: new Date(msg.created_at),
-        status: 'sent' as const,
-      },
-      {
+    const formattedMessages = session.messages.flatMap((msg) => {
+      // Try to parse the response as JSON to check if it contains rich content
+      let botMessage: Message = {
         id: msg.id * 2 + 1,
         text: msg.response,
         isUser: false,
         timestamp: new Date(msg.created_at),
+        status: 'sent' as const,
+      };
+
+      // Try to restore rich content structure from the response
+      try {
+        const responseData = JSON.parse(msg.response);
+        if (responseData && typeof responseData === 'object' && responseData.contentType) {
+          botMessage = {
+            ...botMessage,
+            contentType: responseData.contentType,
+            content: responseData.content,
+            text: responseData.text || msg.response,
+          };
+        }
+      } catch (error) {
+        // If parsing fails, check if the response looks like a script/idea/tips based on content
+        const responseText = msg.response.toLowerCase();
+        if (responseText.includes('script') && responseText.includes('viral')) {
+          // Try to reconstruct a script content structure
+          const lines = msg.response.split('\n').filter(line => line.trim());
+          if (lines.length > 1) {
+            botMessage.contentType = 'script';
+            botMessage.content = {
+              title: 'TikTok Script',
+              description: msg.response,
+              wordCount: msg.response.split(' ').length,
+            };
+          }
+        } else if (responseText.includes('idea') && (responseText.includes('video') || responseText.includes('content'))) {
+          botMessage.contentType = 'idea';
+          botMessage.content = {
+            title: 'Content Idea',
+            description: msg.response,
+          };
+        } else if (responseText.includes('tip') || responseText.includes('advice')) {
+          // Try to extract tips from numbered/bulleted lists
+          const tipMatches = msg.response.match(/(?:^|\n)(?:\d+\.|\*|-)\s*(.+)/gm);
+          if (tipMatches && tipMatches.length > 1) {
+            botMessage.contentType = 'tips';
+            botMessage.content = {
+              title: 'TikTok Tips',
+              listItems: tipMatches.map(tip => tip.replace(/^(?:\d+\.|\*|-)\s*/, '').trim()),
+            };
+          }
+        }
       }
-    ]).filter((msg) => msg.text && msg.text.trim());
+
+      return [
+        {
+          id: msg.id * 2,
+          text: msg.content,
+          isUser: true,
+          timestamp: new Date(msg.created_at),
+          status: 'sent' as const,
+        },
+        botMessage,
+      ];
+    }).filter((msg) => msg.text && msg.text.trim());
     
     console.log('Loaded messages for session:', session.id, formattedMessages);
     setMessages(formattedMessages);
@@ -1637,7 +1687,7 @@ Pro Tips:
                       key={message.id}
                       className={`flex ${message.isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}
                     >
-                      <div className={`max-w-2xl ${message.isUser ? 'order-1' : 'order-2'}`}>
+                      <div className={`max-w-[85%] sm:max-w-md md:max-w-2xl ${message.isUser ? 'order-1' : 'order-2'}`}>
                         <div className={`px-4 py-3 md:px-6 md:py-4 rounded-2xl shadow-sm text-sm md:text-base ${
                           message.isUser 
                             ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white' 
@@ -1853,17 +1903,17 @@ Pro Tips:
                   <button
                     type="submit"
                     disabled={loading || !inputMessage.trim()}
-                    className="px-6 py-3 md:px-8 md:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-full hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 text-sm md:text-base"
+                    className="px-4 py-3 md:px-8 md:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-full hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 text-sm md:text-base flex items-center justify-center min-w-[48px]"
                   >
                     {loading ? (
                       <div className="animate-spin rounded-full h-4 w-4 md:h-5 md:w-5 border-2 border-white border-t-transparent" />
                     ) : (
-                      <span className="hidden md:inline">Send</span>
-                    )}
-                    {!loading && (
-                      <svg className="w-4 h-4 md:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                      </svg>
+                      <>
+                        <span className="hidden md:inline">Send</span>
+                        <svg className="w-5 h-5 md:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                        </svg>
+                      </>
                     )}
                   </button>
                 </div>

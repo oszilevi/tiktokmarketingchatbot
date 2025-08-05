@@ -238,6 +238,11 @@ export default function LoginPage() {
                   onClick={() => {
                     setIsLogin(!isLogin);
                     setError('');
+                    // Clear form inputs when switching modes
+                    setEmail('');
+                    setUsername('');
+                    setPassword('');
+                    setShowPassword(false);
                   }}
                   className="group text-sm font-medium text-gray-600 hover:text-indigo-600 transition-all duration-200 p-2 rounded-lg hover:bg-gray-50"
                 >
