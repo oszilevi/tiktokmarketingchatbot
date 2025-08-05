@@ -12,6 +12,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if email is in allowed_emails table
+    const { data: allowedEmail, error: allowedError } = await supabase
+      .from('allowed_emails')
+      .select('email')
+      .eq('email', email.toLowerCase())
+      .single();
+
+    if (allowedError || !allowedEmail) {
+      return NextResponse.json(
+        { detail: "This email is not authorized to register. Please contact an administrator." },
+        { status: 403 }
+      );
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -34,10 +48,11 @@ export async function POST(request: NextRequest) {
       message: "User created successfully",
       user: data.user 
     });
-  } catch {
+  } catch (error) {
+    console.error('Registration error:', error);
     return NextResponse.json(
-      { detail: "Invalid request" },
-      { status: 400 }
+      { detail: "Database error adding user" },
+      { status: 500 }
     );
   }
 }

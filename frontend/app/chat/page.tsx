@@ -456,47 +456,13 @@ export default function ChatPage() {
         status: 'sent' as const,
       };
 
-      // Try to restore rich content structure from the response
-      try {
-        const responseData = JSON.parse(msg.response);
-        if (responseData && typeof responseData === 'object' && responseData.contentType) {
-          botMessage = {
-            ...botMessage,
-            contentType: responseData.contentType,
-            content: responseData.content,
-            text: responseData.text || msg.response,
-          };
-        }
-      } catch (error) {
-        // If parsing fails, check if the response looks like a script/idea/tips based on content
-        const responseText = msg.response.toLowerCase();
-        if (responseText.includes('script') && responseText.includes('viral')) {
-          // Try to reconstruct a script content structure
-          const lines = msg.response.split('\n').filter(line => line.trim());
-          if (lines.length > 1) {
-            botMessage.contentType = 'script';
-            botMessage.content = {
-              title: 'TikTok Script',
-              description: msg.response,
-              wordCount: msg.response.split(' ').length,
-            };
-          }
-        } else if (responseText.includes('idea') && (responseText.includes('video') || responseText.includes('content'))) {
-          botMessage.contentType = 'idea';
-          botMessage.content = {
-            title: 'Content Idea',
-            description: msg.response,
-          };
-        } else if (responseText.includes('tip') || responseText.includes('advice')) {
-          // Try to extract tips from numbered/bulleted lists
-          const tipMatches = msg.response.match(/(?:^|\n)(?:\d+\.|\*|-)\s*(.+)/gm);
-          if (tipMatches && tipMatches.length > 1) {
-            botMessage.contentType = 'tips';
-            botMessage.content = {
-              title: 'TikTok Tips',
-              listItems: tipMatches.map(tip => tip.replace(/^(?:\d+\.|\*|-)\s*/, '').trim()),
-            };
-          }
+      // Apply the same content detection logic used when creating new messages
+      const detectedType = detectContentType(msg.content);
+      if (detectedType !== 'text') {
+        // Recreate the rich content structure that was applied originally
+        const updatedMessage = applyRichContentStructure(botMessage, msg.response, detectedType);
+        if (updatedMessage.contentType) {
+          botMessage = updatedMessage;
         }
       }
 
@@ -946,6 +912,53 @@ export default function ChatPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Apply rich content structure to a message (used for persistence)
+  const applyRichContentStructure = (message: Message, responseText: string, contentType: string): Message => {
+    if (contentType === 'script') {
+      const sampleScript = responseText;
+      return {
+        ...message,
+        contentType: 'script',
+        text: 'Here\'s a viral TikTok script tailored for you:',
+        content: {
+          title: 'Viral TikTok Script',
+          description: sampleScript,
+          wordCount: sampleScript.split(' ').length,
+          estimatedTime: `${Math.ceil(sampleScript.split(' ').length / 150)} min read`,
+        }
+      };
+    } else if (contentType === 'idea') {
+      return {
+        ...message,
+        contentType: 'idea',
+        text: 'Here\'s a creative TikTok idea for you:',
+        content: {
+          title: 'Creative TikTok Idea',
+          description: responseText,
+          thumbnail: '/api/placeholder/400/300',
+          tags: ['viral', 'trending', 'creative'],
+        }
+      };
+    } else if (contentType === 'tips') {
+      // Extract tips from the response
+      const tipMatches = responseText.match(/(?:^|\n)(?:\d+\.|\*|-)\s*(.+)/gm);
+      if (tipMatches && tipMatches.length > 1) {
+        const tips = tipMatches.map(tip => tip.replace(/^(?:\d+\.|\*|-)\s*/, '').trim());
+        return {
+          ...message,
+          contentType: 'tips',
+          text: 'Here are some expert TikTok tips for you:',
+          content: {
+            title: 'TikTok Success Tips',
+            listItems: tips,
+          }
+        };
+      }
+    }
+    
+    return message;
   };
 
   // Content type detection logic
