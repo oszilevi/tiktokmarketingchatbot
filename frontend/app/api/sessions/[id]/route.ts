@@ -184,13 +184,12 @@ export async function DELETE(
       );
     }
 
-    // Delete associated notes
+    // Delete associated notes (notes table doesn't have user_id, only session_id)
     console.log('DELETE: Deleting notes...');
     const { error: notesError } = await supabase
       .from('notes')
       .delete()
-      .eq('session_id', sessionId)
-      .eq('user_id', user.id);
+      .eq('session_id', sessionId);
       
     if (notesError) {
       console.error('DELETE: Notes error:', notesError);
