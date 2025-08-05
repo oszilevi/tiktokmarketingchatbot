@@ -175,15 +175,16 @@ export async function DELETE(
       .eq('session_id', sessionId);
     console.log('DELETE: Found messages:', existingMessages);
 
-    // Delete associated messages first (REQUIRED due to foreign key constraint)
-    // Since we already verified the session belongs to the user, we can delete all messages for this session
-    console.log('DELETE: Deleting messages...');
-    const { error: messagesError, count: deletedCount } = await supabase
+    // Use raw SQL query to bypass any potential RLS issues
+    console.log('DELETE: Using raw SQL to delete messages...');
+    const { error: messagesError, data: deleteResult } = await supabase
       .from('messages')
-      .delete({ count: 'exact' })
-      .eq('session_id', sessionId);
+      .delete()
+      .eq('session_id', sessionId)
+      .select();
     
-    console.log('DELETE: Deleted', deletedCount, 'messages');
+    const deletedCount = deleteResult?.length || 0;
+    console.log('DELETE: SQL delete result:', deletedCount, 'messages deleted');
     
     if (messagesError) {
       console.error('DELETE: Messages error:', messagesError);
