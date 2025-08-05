@@ -207,7 +207,9 @@ export default function ChatPage() {
       }
       
       // Delete from database
-      await chatApi.deleteSession(sessionId);
+      console.log('Attempting to delete session:', sessionId);
+      const deleteResult = await chatApi.deleteSession(sessionId);
+      console.log('Delete result:', deleteResult);
       
       // Track this session as deleted to prevent refresh from bringing it back
       setDeletedSessionIds(prev => new Set([...prev, sessionId]));

@@ -138,6 +138,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log('DELETE endpoint called');
   try {
     const authHeader = request.headers.get('authorization');
 
@@ -165,22 +166,30 @@ export async function DELETE(
 
     const { id } = await params;
     const sessionId = parseInt(id);
+    console.log('DELETE: sessionId =', sessionId, 'user_id =', user.id);
 
     // Delete associated messages first (cascade should handle this, but being explicit)
-    await supabase
+    console.log('DELETE: Deleting messages...');
+    const { error: messagesError } = await supabase
       .from('messages')
       .delete()
       .eq('session_id', sessionId)
       .eq('user_id', user.id);
+    
+    if (messagesError) console.log('DELETE: Messages error:', messagesError);
 
     // Delete associated notes
-    await supabase
+    console.log('DELETE: Deleting notes...');
+    const { error: notesError } = await supabase
       .from('notes')
       .delete()
       .eq('session_id', sessionId)
       .eq('user_id', user.id);
+      
+    if (notesError) console.log('DELETE: Notes error:', notesError);
 
     // Delete the session
+    console.log('DELETE: Deleting session...');
     const { error } = await supabase
       .from('chat_sessions')
       .delete()
@@ -188,15 +197,17 @@ export async function DELETE(
       .eq('user_id', user.id);
 
     if (error) {
-      console.error('Database error deleting session:', error);
+      console.error('DELETE: Database error deleting session:', error);
       return NextResponse.json(
         { detail: "Failed to delete session" },
         { status: 500 }
       );
     }
 
+    console.log('DELETE: Session deleted successfully');
     return NextResponse.json({ message: "Session deleted successfully" });
-  } catch {
+  } catch (error) {
+    console.error('DELETE: Unexpected error:', error);
     return NextResponse.json(
       { detail: "Invalid request" },
       { status: 400 }

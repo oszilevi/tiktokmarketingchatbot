@@ -133,7 +133,9 @@ export const chatApi = {
 
   deleteSession: async (sessionId: number) => {
     try {
+      console.log('API: Calling DELETE /sessions/' + sessionId);
       const response = await api.delete(`/sessions/${sessionId}`);
+      console.log('API: Delete response:', response.status, response.data);
       return response.data;
     } catch (error) {
       console.error('API: Failed to delete session:', error);
