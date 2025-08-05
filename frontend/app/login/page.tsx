@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { authApi } from '@/lib/supabase-api';
+import { authApi, chatApi } from '@/lib/supabase-api';
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -22,6 +22,13 @@ export default function LoginPage() {
     try {
       if (isLogin) {
         await authApi.login(email, password);
+        // Create a new chat session and redirect to it
+        try {
+          const newSession = await chatApi.createSession('New Chat');
+          console.log('Created new session after login:', newSession);
+        } catch (sessionError) {
+          console.log('Could not create session, proceeding to chat anyway:', sessionError);
+        }
         router.push('/chat');
       } else {
         await authApi.register(email, username, password);

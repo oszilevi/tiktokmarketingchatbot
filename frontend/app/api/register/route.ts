@@ -13,18 +13,32 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if email is in allowed_emails table
+    console.log('Checking email:', email.toLowerCase());
     const { data: allowedEmail, error: allowedError } = await supabase
       .from('allowed_emails')
       .select('email')
       .eq('email', email.toLowerCase())
       .single();
 
-    if (allowedError || !allowedEmail) {
+    console.log('Allowed email check result:', { allowedEmail, allowedError });
+
+    if (allowedError) {
+      console.error('Database error checking allowed emails:', allowedError);
+      return NextResponse.json(
+        { detail: `Database error: ${allowedError.message}` },
+        { status: 500 }
+      );
+    }
+
+    if (!allowedEmail) {
+      console.log('Email not found in allowed_emails table');
       return NextResponse.json(
         { detail: "This email is not authorized to register. Please contact an administrator." },
         { status: 403 }
       );
     }
+
+    console.log('Email is allowed, proceeding with registration');
 
     const { data, error } = await supabase.auth.signUp({
       email,

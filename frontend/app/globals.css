@@ -22,12 +22,63 @@
 html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Fix mobile viewport height issues */
+  height: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* Mobile viewport fix */
+@supports (-webkit-touch-callout: none) {
+  .h-screen {
+    height: -webkit-fill-available;
+  }
+}
+
+/* Prevent horizontal scrolling on mobile */
+* {
+  box-sizing: border-box;
+}
+
+/* Mobile-specific fixes */
+@media screen and (max-width: 768px) {
+  body {
+    /* Prevent zoom on input focus on iOS */
+    -webkit-text-size-adjust: 100%;
+  }
+  
+  .h-screen {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+  
+  /* Fix mobile viewport unit issues */
+  :root {
+    --vh: 1vh;
+  }
+  
+  /* Better mobile scrolling */
+  .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Prevent mobile input zoom */
+  input[type="text"], textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* JavaScript will set this CSS custom property */
+.mobile-vh {
+  height: calc(var(--vh, 1vh) * 100);
 }
 
 .bg-grid-slate-100 {

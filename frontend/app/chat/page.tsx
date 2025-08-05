@@ -1391,7 +1391,7 @@ Pro Tips:
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50" style={{ height: '100vh', minHeight: '100vh' }}>
       {/* Consolidated Header with Navigation */}
       <header className="bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
         <div className="flex items-center justify-between px-4 md:px-6 py-2 md:py-3">
